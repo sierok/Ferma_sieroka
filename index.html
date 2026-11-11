@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>лужайка sieroka</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;600;800&display=swap">
+<style>
+:root{--bg:#E6F1E9;--panel:#FFFFFF;--ink:#1F2D2A;--muted:#5D706A;--yolk:#F2B33D;--yolk-ink:#2B1D00;--red:#D6483B;--blue:#2F7DD1;--line:#CFE0D5;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#0F1A17;--panel:#18262F;--ink:#E7F0EC;--muted:#92A8A0;--yolk:#F5BE50;--red:#FF6A5C;--blue:#5AA2F0;--line:#26363A}}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#0F1A17;--panel:#18262F;--ink:#E7F0EC;--muted:#92A8A0;--yolk:#F5BE50;--red:#FF6A5C;--blue:#5AA2F0;--line:#26363A}
+*,*::before,*::after{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.45 Rubik,system-ui,-apple-system,"Segoe UI",sans-serif}
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--ink);color:var(--bg);display:flex;justify-content:space-around;padding:10px;font-weight:600;font-size:15px}
+.wrap{max-width:640px;margin:0 auto;padding:10px 12px 40px}
+.field{position:relative;width:100%;height:340px;border-radius:12px;overflow:hidden}
+canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+html,body{max-width:100%;overflow-x:hidden}
+body,button{touch-action:manipulation}
+.wrap,.item span{min-width:0}
+.msg{margin:10px 2px;min-height:24px;font-weight:600}
+.msg.bad{color:var(--red)}
+.evbar{background:var(--red);color:#fff;font-weight:600;padding:8px 12px;border-radius:8px;margin-bottom:8px;text-align:center}
+.row{display:grid;gap:8px;margin-bottom:8px}
+.r2{grid-template-columns:1fr 1fr}.r3{grid-template-columns:1fr 1fr 1fr}
+button{font:600 14px Rubik,sans-serif;border:0;border-radius:8px;padding:12px 8px;background:var(--yolk);color:var(--yolk-ink);cursor:pointer}
+button.alt{background:var(--blue);color:#fff}
+button.ghost{background:var(--panel);color:var(--ink);border:1px solid var(--line)}
+button:disabled{opacity:.45;cursor:not-allowed}
+:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:8px}
+.sub{color:var(--muted);margin:0 0 8px;font-size:14px}
+.item{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid var(--line)}
+.item span{flex:1}
+.ov{position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center}
+.sheet{width:100%;max-width:640px;max-height:80vh;overflow-y:auto;background:var(--panel);border-radius:16px 16px 0 0;padding:14px 14px calc(14px + env(safe-area-inset-bottom,0px))}
+.sh{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;font-size:18px}
+.sh .x{padding:8px 12px}
+.item button{padding:8px 10px}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.3/dist/umd/supabase.js"></script>
+</head>
+<body>
+<div class="top"><span id="c"></span><span id="g"></span><span id="e"></span><span id="d"></span></div>
+<div class="wrap">
+<div class="evbar" id="ev" hidden></div>
+<div class="evbar" id="ev2" hidden style="background:linear-gradient(90deg,#B8860B,#F5D76E);color:#2B1D00"></div>
+<div class="sub" id="who" style="margin:0 0 6px;text-align:center"></div>
+<div class="field" id="field"><canvas id="cv"></canvas></div>
+<p class="msg" id="msg">Кормите и поите кур, иначе они погибнут.</p>
+<div class="row r2"><button id="feed">Корм курице (3)</button><button class="alt" id="water">Вода курам</button></div>
+<div class="row r2" id="dogrow" hidden><button id="dfeed">Корм собаке (5)</button><button class="alt" id="dwater">Вода собакам</button></div>
+<div class="row r3"><button class="ghost" id="sell">Рынок</button><button class="ghost" id="rb">Набег</button><button class="ghost" id="sb">Магазин</button></div>
+<div class="card" id="incrow" hidden><div style="display:flex;align-items:center;justify-content:space-between;gap:10px"><span id="incinfo" style="line-height:1.5"></span><button id="inc">Начать инкубацию (3 🥈)</button></div></div>
+<div class="ov" id="reg" hidden><div class="sheet">
+<div class="sh"><b>Аккаунт</b></div>
+<div class="row r2" style="margin-bottom:10px"><button id="tabup" class="alt">Регистрация</button><button id="tabin" class="ghost">Вход</button></div>
+<p class="sub">Придумайте ник и пароль. С ними можно зайти с любого устройства, и прогресс подтянется.</p>
+<input id="nick" maxlength="16" placeholder="Ник" autocomplete="username" style="width:100%;padding:12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:inherit">
+<input id="pass" type="password" placeholder="Пароль (от 6 символов)" autocomplete="current-password" style="width:100%;padding:12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:inherit;margin-top:8px">
+<button id="regbtn" style="width:100%;margin-top:10px">Зарегистрироваться</button><p class="sub" id="regmsg" style="margin:8px 0"></p>
+<button class="ghost" id="skipbtn" style="width:100%">Играть без аккаунта</button>
+</div></div>
+<div class="ov" id="market" hidden><div class="sheet"><div class="sh"><b>Рынок</b><button class="ghost x" data-close>Закрыть</button></div>
+<p class="sub" id="mmsg" style="min-height:20px"></p>
+<div class="card" style="text-align:center"><div class="sub">Цена яйца сейчас</div><div id="mprice" style="font-size:36px;font-weight:800"></div><div id="mtrend" class="sub"></div><div id="mnext" class="sub"></div></div>
+<div id="mhist" style="display:flex;align-items:flex-end;gap:4px;height:70px;margin:10px 0"></div>
+<div class="row r2" style="margin:0"><button id="msell1">Продать 1 яйцо</button><button class="alt" id="msellall">Продать все</button></div>
+</div></div>
+<div class="ov" id="raid" hidden><div class="sheet"><div class="sh"><b>Набег</b><button class="ghost x" data-close>Закрыть</button></div><p class="sub" id="rmsg" style="min-height:20px"></p>
+<p class="sub" id="target">Найдите ферму для набега. Поиск стоит 20 монет.</p>
+<div class="field" id="rf" style="height:240px;margin-bottom:8px"><canvas id="rc"></canvas></div>
+<p class="sub" id="toolhint">Выберите действие: бомба ломает забор, мясо отвлекает собак. Потом нажмите «Ворваться».</p>
+<div class="row r3"><button id="tb" class="ghost">💣 Бомба (25)</button><button id="tm" class="ghost">🥩 Мясо (10)</button><button id="attack" disabled>Ворваться</button></div>
+<div class="row r2" style="margin:0"><button class="alt" id="search">Искать ферму (20)</button><button class="ghost" data-close>Закрыть</button></div>
+</div></div>
+<div class="ov" id="shop" hidden><div class="sheet"><div class="sh"><b>Магазин</b><button class="ghost x" data-close>Закрыть</button></div><p class="sub" id="smsg" style="min-height:20px"></p><div class="item" style="border-top:0"><span id="dur"></span><button id="repair">Починить</button></div><div class="item"><span id="lockinfo"></span><button class="alt" id="unlock" disabled>Сбросить (10 крист.)</button></div>
+<div id="items"></div>
+<p class="sub" style="margin-top:10px">Кристаллы: донат-валюта. Демо: начисляются бесплатно, оплата не подключена.</p>
+<div class="row r2" style="margin:0"><button class="alt" data-gem="20">+20 кристаллов · 99 ₽</button><button class="alt" data-gem="60">+60 кристаллов · 249 ₽</button></div>
+</div></div>
+</div>
+
+<script>
+var $=function(i){return document.getElementById(i)};
+var P={ch:["Курица",40,4],fence:["Звено забора (10 звеньев = +5 защиты)",30,3],dog:["Пёс (+2 защиты, нужны корм и вода)",120,12],trap:["Капкан (+1,5 защиты, максимум 5, тратится только при дырах в заборе)",35,4],hf:["Кормушка для кур (3 порции, пополнить 9 мон.)",40,4],hw:["Поилка для кур (3 порции, пополнить 6 мон.)",40,4],df:["Кормушка для собак (3 порции, пополнить 15 мон.)",50,5],dw:["Поилка для собак (3 порции, пополнить 6 мон.)",40,4]};
+var names=["Ферма Петровича","Курятник Семёныча","Ранчо Зорьки","Усадьба Кукарека","Двор тёти Вали"];
+var s={coins:100,gems:0,eggs:0,def:[],fz:[0,0,0,0,0,0,0,0,0,0],st:{hf:-1,hw:-1,df:-1,dw:-1},t:null,raidIn:40};
+var hens=[],dogs=[],pops=[],ghosts=[],tufts=[],flowers=[];
+var cv=$("cv"),cx=cv.getContext("2d"),W=360,H=340;
+function rnd(a,b){return a+Math.floor(Math.random()*(b-a+1))}
+function say(m,bad){var e=$("msg"),sm=$("smsg"),rm=$("rmsg"),mm=$("mmsg");if(mm)mm.textContent=m;e.textContent=m;e.className="msg"+(bad?" bad":"");if(sm)sm.textContent=m;if(rm)rm.textContent=m}
+var D={fence:{n:"забор",pw:0,hp:4},dog:{n:"пёс",pw:2,hp:3},trap:{n:"капкан",pw:1.5,hp:1}};
+function pwr(a){return a.reduce(function(x,i){return x+D[i.t].pw},0)}
+function def(){return pwr(s.def)+fdef(s.fz)}
+function fdef(z){return z.every(function(h){return h>0})?5:0}
+function fhit(z){if(!z.every(function(h){return h>0}))return 0;var i=rnd(0,z.length-1),b=0;[[i,2],[i-1,1],[i+1,1]].forEach(function(p){var j=p[0];if(j<0||j>=z.length)return;z[j]=Math.max(0,z[j]-p[1]);if(z[j]===0)b++});return b}
+function cnt(t){return t==="fence"?s.fz.filter(function(h){return h>0}).length:s.def.filter(function(i){return i.t===t}).length}
+function mkdef(t){return{t:t,hp:D[t].hp}}
+function mkDog(){var d=mk();d.f=100;d.w=100;return d}
+function drop(o,sec){o.f=Math.min(o.f,Math.max(5,o.f-.06*sec));o.w=Math.min(o.w,Math.max(5,o.w-.075*sec))}
+function offFor(o,sec,fk,wk,lethal){
+[["f",fk,.06],["w",wk,.075]].forEach(function(a){
+var key=a[0],st=a[1],r=a[2],left=sec;
+while(left>0){
+var t=o[key]>35?(o[key]-35)/r:0;
+if(left<=t){o[key]-=r*left;break}
+left-=t;if(o[key]>35)o[key]=35;
+if(s.st[st]>0){s.st[st]--;o[key]=100}
+else{o[key]=lethal?o[key]-r*left:Math.min(o[key],Math.max(5,o[key]-r*left));break}
+}});
+}
+var offDead=0;
+function offline(sec){
+hens.forEach(function(h){offFor(h,sec,"hf","hw",true)});
+dogs.forEach(function(d){offFor(d,sec,"df","dw",false)});
+var n=hens.filter(function(h){return h.f<=0||h.w<=0}).length;
+if(n){hens=hens.filter(function(h){return h.f>0&&h.w>0});offDead+=n}
+}
+function welcomeMsg(){var m="С возвращением! Пока вас не было, куры и собаки проголодались и захотели пить.";if(offDead){m="Пока вас не было, погибло кур: "+offDead+" (голод или жажда). Кормите и поите оставшихся!";offDead=0}if(offLog.length){m+=" События: "+offLog.join("; ")+".";offLog=[]}return m}
+var offLog=[],silverHen=null,clockOff=0;
+function nowS(){return Date.now()+clockOff}
+async function syncClock(){try{var t0=Date.now(),r=await sb.rpc("server_time");if(r.error||r.data==null)return;clockOff=Number(r.data)-(t0+Date.now())/2}catch(e){}}
+setInterval(function(){if(sb)syncClock()},600000);
+function silverFor(k){return rng(k*5+11)<0.003?{at:k*SLOT+Math.floor((.1+.6*rng(k*5+12))*SLOT)}:null}
+function silverTick(dt){
+var now=nowS(),k=Math.floor(now/SLOT),ev=silverFor(k),b=$("ev2"),forced=(window.silverUntil||0)>Date.now(),left=0;
+if(forced)left=window.silverUntil-Date.now();
+else if(ev&&now>=ev.at&&now<=ev.at+60000&&s.silverK!==k)left=ev.at+60000-now;
+if(left<=0){silverHen=null;b.hidden=true;return}
+if(!silverHen){silverHen=mk();say("👑 Легендарное событие! Появилась серебряная курица в очках. Поймайте её!")}
+wander(silverHen,dt,42);
+b.hidden=false;b.textContent="👑 ЛЕГЕНДАРНОЕ СОБЫТИЕ! Серебряная курица в очках: ещё "+Math.ceil(left/1000)+" с";
+}
+function catchSilver(){s.silverK=Math.floor(nowS()/SLOT);window.silverUntil=0;s.silver=(s.silver||0)+3;silverHen=null;say("Вы поймали серебряную курицу! +3 серебряных яйца. Их нельзя украсть.")}
+function incUI(){
+var row=$("incrow"),sv=s.silver||0,b=$("inc"),info=["🥈 Легендарных серебряных яиц: "+sv];
+if(s.inc){var left=s.inc.end-Date.now();
+if(left<=0){s.code="ты нашёл пасхалку";s.inc=null;say("🐣 Из яйца вылупился секретный код: "+s.code)}
+else info.push("Инкубация: осталось "+Math.floor(left/60000)+" мин "+Math.floor(left/1000)%60+" с")}
+if(s.code)info.push("🐣 Секретный код: "+s.code);
+row.hidden=!(sv||s.inc||s.code);
+b.disabled=!!s.inc||sv<3;
+$("incinfo").innerHTML=info.join("<br>");
+}
+$("inc").onclick=function(){if(s.inc)return;if((s.silver||0)<3)return say("Нужно 3 серебряных яйца.",true);s.silver-=3;s.inc={end:Date.now()+3600000};say("Инкубация началась. Через час вылупится секретный код.")};
+setInterval(incUI,1000);
+function windQuiet(){var ids=[];s.fz.forEach(function(h,i){if(h>0)ids.push(i)});if(!ids.length)return 0;var i=ids[rnd(0,ids.length-1)];s.fz[i]--;if(s.fz[i]<=0){s.fz[i]=0;return 1}return 0}
+function fireQuiet(t){
+if(t==="grip"){var k=Math.min(hens.length,rnd(3,5));for(var i=0;i<k;i++)hens.splice(rnd(0,hens.length-1),1);return"птичий грипп, погибло кур: "+k}
+if(t==="fox"){
+if(fdef(s.fz)>0){var z=s.fz,c=0;for(var j=0;j<4;j++){var q=rnd(0,9);if(z[q]>0){z[q]=0;c++}}return"лисы сломали звеньев забора: "+c}
+var sv=Math.min(hens.length,cnt("dog")*2),eat=hens.length-sv;hens.splice(0,eat);return"лисы съели кур: "+eat}
+if(t==="bear"){var tn=cnt("trap");s.def=s.def.filter(function(i){return i.t!=="trap"});return"медведь снёс капканов: "+tn}
+var b=0;for(var w=0;w<6;w++)b+=windQuiet();return"сильный ветер, сломано звеньев забора: "+b;
+}
+function offlineSim(from,to){
+if((to-from)/1000<10)return[];
+var limit=Math.max(from,to-12*3600*1000),log=[],cur=from;
+for(var k=Math.floor(limit/SLOT);k<=Math.floor(to/SLOT);k++){
+var ev=evFor(k);if(!ev||ev.at<=from||ev.at>to||ev.at<limit)continue;
+if(ev.at>cur){offline((ev.at-cur)/1000);cur=ev.at}
+log.push(fireQuiet(ev.type));s.evDone=k;
+}
+offline((to-cur)/1000);
+return log;
+}
+function away(from,to){var l=offlineSim(from,to);offLog=l.length>6?l.slice(-6).concat(["и ещё событий раньше: "+(l.length-6)]):l}
+function spos(k){var m={hf:.12,hw:.32,df:.68,dw:.88};return{x:W*m[k],y:56}}
+function seek(o,dt,fk,wk,sp){
+var k=o.f<35&&s.st[fk]>0?fk:(o.w<35&&s.st[wk]>0?wk:null);
+if(!k)return false;
+var p=spos(k),dx=p.x-o.x,dy=p.y+24-o.y,d=Math.hypot(dx,dy);
+if(d<10){s.st[k]--;if(k===fk)o.f=100;else o.w=100;o.wait=1;return true}
+o.x+=dx/d*sp*dt;o.y+=dy/d*sp*dt;if(Math.abs(dx)>1)o.dir=dx>0?1:-1;return true;
+}
+var R={hf:[9,1],hw:[6,1],df:[15,1],dw:[6,1]};
+function refill(k,cur){
+var p=P[k],key=cur==="gems"?"gems":"coins";
+if(s.st[k]<0){var price=p[cur==="gems"?2:1];if(s[key]<price)return say("Не хватает "+(cur==="gems"?"кристаллов.":"монет."),true);s[key]-=price;s.st[k]=3;return say("Построено. Внутри 3 порции.")}
+if(s.st[k]>=3)return say("Уже полная, пополнять не нужно.");
+var c=R[k][cur==="gems"?1:0];
+if(s[key]<c)return say("Для пополнения нужно "+c+(cur==="gems"?" крист.":" мон."),true);
+s[key]-=c;s.st[k]=3;say("Пополнено: 3 порции.");
+}
+function hit(arr,n){var lost=[];for(var i=0;i<n;i++){var pool=arr.filter(function(x){return x.t!=="trap"});if(!pool.length)break;var it=pool[rnd(0,pool.length-1)];it.hp--;if(it.hp<=0){arr.splice(arr.indexOf(it),1);lost.push(D[it.t].n);if(arr===s.def&&it.t==="dog")dogs.pop()}}return lost}
+function useTrap(arr){var i=arr.findIndex(function(x){return x.t==="trap"});if(i<0)return false;arr.splice(i,1);return true}
+function chance(){return Math.max(.15,Math.min(.9,.95-(pwr(s.t.items)+fdef(s.t.fz))*.1))}
+function size(){var f=$("field"),d=window.devicePixelRatio||1,w=f.clientWidth,h=f.clientHeight;if(!w||!h)return;W=w;H=h;cv.width=Math.round(W*d);cv.height=Math.round(H*d);cx.setTransform(d,0,0,d,0,0);hens.concat(dogs).forEach(function(o){o.x=Math.min(o.x,W-20);o.y=Math.min(o.y,H-20);o.tx=o.x;o.ty=o.y})}
+function pt(){return{x:20+Math.random()*(W-40),y:50+Math.random()*(H-80)}}
+function mk(){var p=pt();return{x:p.x,y:p.y,tx:p.x,ty:p.y,wait:Math.random()*2,dir:1}}
+function newHen(){var h=mk();h.f=100;h.w=100;h.p=0;hens.push(h)}
+function wander(o,dt,sp){
+if(o.wait>0){o.wait-=dt;return false}
+var dx=o.tx-o.x,dy=o.ty-o.y,d=Math.hypot(dx,dy);
+if(d<3){var p=pt();o.tx=p.x;o.ty=p.y;o.wait=.5+Math.random()*2;return false}
+o.x+=dx/d*sp*dt;o.y+=dy/d*sp*dt;if(Math.abs(dx)>1)o.dir=dx>0?1:-1;return true;
+}
+for(var i=0;i<45;i++)tufts.push({x:Math.random(),y:Math.random()});
+for(i=0;i<16;i++)flowers.push({x:Math.random(),y:Math.random(),c:["#fff","#FFD54A","#FF8FAB"][i%3]});
+function update(dt){
+hens.forEach(function(h){
+h.f-=1.2*dt;h.w-=1.5*dt;
+if(h.f<=0||h.w<=0){h.dead=true;ghosts.push({x:h.x,y:h.y,t:0});say("Курица погибла: "+(h.f<=0?"кончилось зерно.":"кончилась вода."),true);return}
+if(h.f>20&&h.w>20){h.p+=8*dt;if(h.p>=100){h.p=0;s.eggs++;pops.push({x:h.x,y:h.y,t:0})}}
+if(seek(h,dt,"hf","hw",50))return;wander(h,dt,34);
+});
+var before=hens.length;
+hens=hens.filter(function(h){return!h.dead});
+if(before&&!hens.length)say("Все куры погибли. Купите новую в магазине.",true);
+if(!hens.length&&s.coins<40&&!s.eggs){s.coins=40;say("Все куры погибли. Вам дали 40 монет на новую курицу.",true)}
+dogs.forEach(function(d){d.f-=1.0*dt;d.w-=1.2*dt;if(d.f<=0||d.w<=0){d.dead=true;ghosts.push({x:d.x,y:d.y,t:0});var di=s.def.findIndex(function(x){return x.t==="dog"});if(di>=0)s.def.splice(di,1);say("Пёс погиб: "+(d.f<=0?"кончился корм.":"кончилась вода."),true);return}if(seek(d,dt,"df","dw",80))return;wander(d,dt,55)});
+dogs=dogs.filter(function(d){return!d.dead});
+pops.forEach(function(p){p.t+=dt});pops=pops.filter(function(p){return p.t<1.2});
+ghosts.forEach(function(p){p.t+=dt});ghosts=ghosts.filter(function(p){return p.t<2});fxs.forEach(function(f){f.t+=dt});fxs=fxs.filter(function(f){return f.t<f.dur});
+s.raidIn-=dt;
+if(false){
+s.raidIn=rnd(35,55);
+if(rnd(1,8)>def()){
+var l=Math.floor(s.eggs*.3),k=Math.min(hens.length,rnd(1,2));s.eggs-=l;
+for(var j=0;j<k;j++){var v=hens.splice(rnd(0,hens.length-1),1)[0];ghosts.push({x:v.x,y:v.y,t:0,e:"🦊"})}
+var tp=!fdef(s.fz)&&useTrap(s.def)?" Капкан сработал и израсходован.":"",br=hit(s.def,2),fb=fhit(s.fz);
+say("Вас ограбили! Украдено кур: "+k+", яиц: "+l+(br.length?". Сломано: "+br.join(", "):"")+"."+(fb?" Сломано звеньев забора: "+fb+".":"")+tp,true);
+}else{var tp2=!fdef(s.fz)&&useTrap(s.def)?" Капкан сработал и израсходован.":"",br2=hit(s.def,1),fb2=fhit(s.fz);say("Налётчики отбиты"+(br2.length?", но сломано: "+br2.join(", "):", оборона выдержала")+"."+(fb2?" Сломано звеньев забора: "+fb2+".":"")+tp2)}
+}
+}
+function hen(x,y,dir,bob,sick){
+cx.save();cx.translate(x,y+bob);cx.scale(dir,1);
+cx.fillStyle="rgba(0,0,0,.18)";cx.beginPath();cx.ellipse(0,16,13,3,0,0,6.3);cx.fill();
+cx.strokeStyle="#E8912D";cx.lineWidth=2;cx.beginPath();cx.moveTo(-3,9);cx.lineTo(-3,15);cx.moveTo(4,9);cx.lineTo(4,15);cx.stroke();
+var body=sick==="silver"?"#C9D3E0":sick?"#DAD6C4":"#FFFFFF";
+cx.fillStyle="#E6E0CE";cx.beginPath();cx.moveTo(-10,2);cx.lineTo(-19,-8);cx.lineTo(-16,3);cx.lineTo(-20,6);cx.lineTo(-9,8);cx.closePath();cx.fill();
+cx.fillStyle=body;cx.strokeStyle="#C9C3B0";cx.lineWidth=1;cx.beginPath();cx.ellipse(0,3,12,10,0,0,6.3);cx.fill();cx.stroke();
+cx.fillStyle="#E3DDCB";cx.beginPath();cx.ellipse(-2,4,6,4.5,-.3,0,6.3);cx.fill();
+cx.fillStyle=body;cx.beginPath();cx.arc(10,-6,6,0,6.3);cx.fill();cx.stroke();
+cx.fillStyle="#D6483B";cx.beginPath();cx.arc(8,-12,2.4,0,6.3);cx.fill();cx.beginPath();cx.arc(11.5,-12.5,2.4,0,6.3);cx.fill();
+cx.fillStyle="#F2A33D";cx.beginPath();cx.moveTo(15,-7.5);cx.lineTo(21,-5);cx.lineTo(15,-3.5);cx.fill();
+cx.fillStyle="#D6483B";cx.beginPath();cx.arc(14,-1.5,1.8,0,6.3);cx.fill();
+cx.fillStyle="#222";cx.beginPath();cx.arc(12,-7.5,1.2,0,6.3);cx.fill();
+if(sick==="silver"){cx.strokeStyle="#222";cx.lineWidth=1.5;cx.beginPath();cx.arc(12,-7.5,3.4,0,6.3);cx.fillStyle="rgba(130,190,255,.4)";cx.fill();cx.stroke();cx.beginPath();cx.moveTo(8.6,-7.5);cx.lineTo(3.5,-8.5);cx.stroke();cx.lineWidth=1}
+cx.restore();
+}
+function emoji(t,x,y,px,flip,a){
+cx.save();cx.globalAlpha=a==null?1:a;cx.translate(x,y);if(flip)cx.scale(-1,1);cx.font=px+"px serif";cx.fillText(t,0,0);cx.restore();
+}
+function draw(now){
+var g=cx.createLinearGradient(0,0,0,H);g.addColorStop(0,"#A6D985");g.addColorStop(1,"#5CA547");
+cx.fillStyle=g;cx.fillRect(0,0,W,H);
+cx.fillStyle="#4A9040";
+tufts.forEach(function(t){var x=t.x*W,y=t.y*H;cx.fillRect(x,y,2,7);cx.fillRect(x+4,y+2,2,5);cx.fillRect(x-4,y+2,2,5)});
+flowers.forEach(function(f){cx.fillStyle=f.c;cx.beginPath();cx.arc(f.x*W,f.y*H,3,0,6.3);cx.fill()});
+var i;
+s.fz.forEach(function(h,j){var x=(j+.5)*W/10;if(h<=0){cx.strokeStyle="rgba(138,90,43,.55)";cx.setLineDash([3,3]);cx.strokeRect(x-8,H-26,16,22);cx.setLineDash([])}else{cx.fillStyle=h>=4?"#8A5A2B":h>=3?"#9C6A35":h>=2?"#B5783A":"#C9553A";var ph=8+h*4;cx.fillRect(x-7,H-4-ph,14,ph)}});
+if(fdef(s.fz)){cx.fillStyle="#8A5A2B";cx.fillRect(0,H-14,W,3)}
+cx.fillStyle="#2B2B2B";
+var tn=cnt("trap");
+for(i=0;i<tn;i++){var tx=(i+.5)*W/tn;cx.fillStyle="#2B2B2B";cx.beginPath();cx.arc(tx,H-34,6,0,6.3);cx.fill();cx.fillStyle="#C9553A";cx.fillRect(tx-5,H-35,10,2)}
+cx.textAlign="center";cx.textBaseline="middle";
+["hf","hw","df","dw"].forEach(function(k){
+var p=spos(k),n=s.st[k],icon={hf:"🌾",hw:"💧",df:"🍖",dw:"🥣"}[k],isH=k[0]==="h";
+if(n<0){cx.save();cx.strokeStyle="rgba(255,255,255,.75)";cx.setLineDash([4,3]);cx.strokeRect(p.x-18,p.y-8,36,18);cx.restore();emoji(icon,p.x,p.y-1,14,false,.5);return}
+cx.fillStyle=isH?"#E9B949":"#B8763A";cx.fillRect(p.x-18,p.y-8,36,18);
+cx.fillStyle=k[1]==="w"?"#4EA8E8":(isH?"#D99A2B":"#8A4F22");cx.fillRect(p.x-15,p.y-5,30,12);
+if(n===0){cx.strokeStyle="#D6483B";cx.lineWidth=2;cx.strokeRect(p.x-18,p.y-8,36,18);cx.lineWidth=1}
+emoji(icon,p.x,p.y-1,14);
+for(var q=0;q<3;q++){cx.fillStyle=q<n?"#fff":"rgba(0,0,0,.3)";cx.beginPath();cx.arc(p.x-8+q*8,p.y+15,2.5,0,6.3);cx.fill()}
+});
+var all=hens.map(function(h){return{y:h.y,h:h}}).concat(dogs.map(function(d){return{y:d.y,d:d}}));
+all.sort(function(a,b){return a.y-b.y});
+all.forEach(function(o){
+if(o.d){var dd=o.d;emoji("🐕",dd.x,dd.y,28,dd.dir>0);cx.fillStyle="rgba(0,0,0,.35)";cx.fillRect(dd.x-13,dd.y-24,26,4);cx.fillRect(dd.x-13,dd.y-19,26,4);cx.fillStyle="#C97B2B";cx.fillRect(dd.x-13,dd.y-24,26*Math.max(0,dd.f)/100,4);cx.fillStyle="#3FA0FF";cx.fillRect(dd.x-13,dd.y-19,26*Math.max(0,dd.w)/100,4);if(dd.f<20||dd.w<20)emoji("⚠️",dd.x,dd.y-35,14);return}
+var h=o.h,hop=Math.sin(now/90+h.x)*2;
+hen(h.x,h.y,h.dir,h.wait>0?0:hop,h.f<20||h.w<20);
+cx.fillStyle="rgba(0,0,0,.35)";cx.fillRect(h.x-13,h.y-27,26,4);cx.fillRect(h.x-13,h.y-22,26,4);
+cx.fillStyle="#F2B33D";cx.fillRect(h.x-13,h.y-27,26*Math.max(0,h.f)/100,4);
+cx.fillStyle="#3FA0FF";cx.fillRect(h.x-13,h.y-22,26*Math.max(0,h.w)/100,4);
+if(h.f<20||h.w<20)emoji("⚠️",h.x,h.y-38,14);
+});
+if(silverHen){hen(silverHen.x,silverHen.y,silverHen.dir,Math.sin(now/70)*2,"silver");emoji("👑",silverHen.x,silverHen.y-36+Math.sin(now/200)*3,16)}
+pops.forEach(function(p){emoji("🥚",p.x,p.y-p.t*30,18,false,1-p.t/1.2)});
+ghosts.forEach(function(p){emoji(p.e||"👻",p.x,p.y-p.t*25,26,false,1-p.t/2)});
+fxs.forEach(function(f){var q=f.t/f.dur;
+if(f.type==="bear")emoji("🐻",-30+q*(W+60),H*.45,48,false);
+else if(f.type==="fox")[0,1,2].forEach(function(i){emoji("🦊",W+30-q*(W+60)-i*36,H*.35+i*40,26,true)});
+else if(f.type==="wind"){for(var i=0;i<6;i++){var u=(f.t*.15+i/6)%1;emoji("🍃",u*(W+40)-20,40+i*45+Math.sin(f.t*3+i)*10,16,false,.7)}}
+else emoji("🤒",W/2,H/2-q*40,34,false,1-q);
+});
+}
+function hud(){
+$("c").textContent="Монеты "+s.coins;$("g").textContent="Кристаллы "+s.gems;
+$("e").textContent="Яйца "+s.eggs;$("d").textContent="Защита "+def();
+$("dogrow").hidden=!dogs.length;
+Object.keys(P).forEach(function(k){var e=$("n_"+k);if(e)e.textContent=k==="ch"?hens.length+" / 12":k==="fence"?cnt(k)+" / 10":k==="trap"?cnt(k)+" / 5":s.st[k]!==undefined?(s.st[k]<0?"нет":s.st[k]+" / 3 порции"):cnt(k)+" шт."});
+var du=$("dur");if(du){var cur=0,mx=0;s.def.forEach(function(i){cur+=i.hp;mx+=D[i.t].hp});s.fz.forEach(function(h){if(h>0){cur+=h;mx+=D.fence.hp}});du.textContent="Сломанные звенья забора нужно докупить, повреждённое можно починить.";$("repair").textContent="Починить ("+(mx-cur)*10+" мон.)";$("repair").disabled=cur===mx}
+$("attack").disabled=!s.t;
+if(s.t)$("target").textContent=s.t.name+": забор "+s.t.fz.filter(function(h){return h>0}).length+"/10, собак: "+s.t.items.filter(function(i){return i.t==="dog"}).length+", яиц на ферме: "+s.t.loot+". Ловушки скрыты.";
+}
+var last=performance.now();
+function loop(now){
+var dt=Math.min(.1,(now-last)/1000);last=now;
+update(dt);draw(now);hud();raidTick(dt,now);evTick();silverTick(dt);requestAnimationFrame(loop);
+}
+function buy(k,cur){if(s.st[k]!==undefined)return refill(k,cur);
+var p=P[k],price=p[cur==="gems"?2:1],key=cur==="gems"?"gems":"coins";
+if(s[key]<price)return say("Не хватает "+(cur==="gems"?"кристаллов.":"монет."),true);
+if(k==="ch"&&hens.length>=12)return say("На лужайке уже 12 кур.",true);
+if(k==="fence"&&cnt("fence")>=10)return say("Забор уже целый: все 10 звеньев стоят.",true);
+if(k==="trap"&&cnt("trap")>=5)return say("Больше 5 капканов поставить нельзя.",true);
+s[key]-=price;
+if(k==="ch")newHen();else if(k==="fence"){s.fz[s.fz.indexOf(0)]=D.fence.hp}else{s.def.push(mkdef(k));if(k==="dog")dogs.push(mkDog())}
+say("Куплено: "+p[0]+".");
+}
+$("items").innerHTML=Object.keys(P).map(function(k){var p=P[k];
+return '<div class="item"><span>'+p[0]+' · <b id="n_'+k+'"></b></span><button data-buy="'+k+'" data-cur="coins">'+p[1]+' мон.</button><button class="alt" data-buy="'+k+'" data-cur="gems">'+p[2]+' крист.</button></div>';
+}).join("");
+$("feed").onclick=function(){
+var n=0;
+hens.forEach(function(h){if(h.f<95&&s.coins>=3){s.coins-=3;h.f=100;n++}});
+say(n?"Покормлено кур: "+n+".":(hens.length?"Куры сыты или не хватает монет.":"Некого кормить."),!n&&hens.length&&s.coins<3);
+};
+$("water").onclick=function(){hens.forEach(function(h){h.w=100});say(hens.length?"Все куры напоены.":"Некого поить.")};
+$("sell").onclick=function(){s.coins+=s.eggs*5;say("Продано яиц: "+s.eggs+", получено монет: "+s.eggs*5+".");s.eggs=0};
+function openSheet(id){$("raid").hidden=id!=="raid";$("shop").hidden=id!=="shop";$("market").hidden=id!=="market"}
+function closeSheets(){$("raid").hidden=true;$("shop").hidden=true;$("market").hidden=true}
+$("rb").onclick=function(){openSheet("raid")};
+document.addEventListener("keydown",function(e){if(e.key==="Escape")closeSheets()});
+$("sb").onclick=function(){openSheet("shop")};
+$("repair").onclick=function(){var mx=0,cur=0;s.def.forEach(function(i){cur+=i.hp;mx+=D[i.t].hp});s.fz.forEach(function(h){if(h>0){cur+=h;mx+=D.fence.hp}});var cost=(mx-cur)*10;if(!cost)return say("Оборона целая.");if(s.coins<cost)return say("На ремонт нужно "+cost+" монет.",true);s.coins-=cost;s.def.forEach(function(i){i.hp=D[i.t].hp});s.fz=s.fz.map(function(h){return h>0?D.fence.hp:0});say("Оборона починена за "+cost+" монет.")};
+$("dfeed").onclick=function(){var n=0;dogs.forEach(function(d){if(d.f<95&&s.coins>=5){s.coins-=5;d.f=100;n++}});say(n?"Накормлено собак: "+n+".":"Собаки сыты или не хватает монет.",!n&&s.coins<5)};
+$("dwater").onclick=function(){dogs.forEach(function(d){d.w=100});say("Все собаки напоены.")};
+$("search").onclick=function(){
+if(s.coins<20)return say("На поиск нужно 20 монет.",true);
+s.coins-=20;var its=[],c=rnd(0,3),ts=["dog","trap","trap"];for(var i=0;i<c;i++)its.push(mkdef(ts[rnd(0,2)]));var fzz=[],cf=Math.random()<.5?10:rnd(0,9);for(i=0;i<10;i++)fzz.push(i<cf?D.fence.hp:0);
+s.t={name:names[rnd(0,names.length-1)],items:its,fz:fzz,loot:rnd(8,24)};
+};
+$("attack").onclick=function(){
+var ok=Math.random()<chance(),br,tp=!fdef(s.t.fz)&&useTrap(s.t.items)?" Сработал капкан.":"",fb=fhit(s.t.fz);
+if(ok){var n=Math.min(s.t.loot,rnd(3,10));s.eggs+=n;s.t.loot-=n;br=hit(s.t.items,2);say("Набег на «"+s.t.name+"» удался: +"+n+" яиц"+(br.length?". У них сломано: "+br.join(", "):"")+"."+(fb?" Звеньев забора сломано: "+fb+".":"")+tp)}
+else{br=hit(s.t.items,1);say("Набег на «"+s.t.name+"» отбит"+(br.length?", но у них сломано: "+br.join(", "):"")+"."+(fb?" Звеньев забора сломано: "+fb+".":"")+tp,true)}
+if(s.t.loot<=0){say($("msg").textContent+" Ферма обчищена, ищите новую.");s.t=null;$("target").textContent="Найдите ферму для набега. Поиск стоит 20 монет."}
+};
+document.addEventListener("click",function(e){
+var t=e.target;
+if(t.dataset.close!==undefined||t.classList.contains("ov"))closeSheets();
+else if(t.dataset.buy)buy(t.dataset.buy,t.dataset.cur);
+else if(t.dataset.gem){s.gems+=+t.dataset.gem;say("Демо: начислено кристаллов: "+t.dataset.gem+".")}
+});
+var edogs=[],ehens=[],etid=null,tool=null,meat=null,bursts=[],rc=$("rc"),rx=rc.getContext("2d"),RW=360,RH=240;
+function rsize(){var f=$("rf"),d=window.devicePixelRatio||1,w=f.clientWidth,h=f.clientHeight;if(!w||!h)return;RW=w;RH=h;rc.width=Math.round(w*d);rc.height=Math.round(h*d);rx.setTransform(d,0,0,d,0,0)}
+function eo(){var o={x:20+Math.random()*(RW-40),y:60+Math.random()*(RH-120),dir:1,wait:Math.random()*2,dist:0,mx:0,my:0};o.tx=o.x;o.ty=o.y;return o}
+function setupEnemy(){edogs=s.t.items.filter(function(i){return i.t==="dog"}).map(eo);var n=Math.min(6,2+Math.floor(s.t.loot/6));ehens=[];for(var i=0;i<n;i++)ehens.push(eo());meat=null;etid=s.t}
+function ew(o,dt,sp){
+if(o.dist>0){o.dist-=dt;var dx=o.mx-o.x,dy=o.my-o.y,d=Math.hypot(dx,dy);if(d>6){o.x+=dx/d*sp*1.8*dt;o.y+=dy/d*sp*1.8*dt;o.dir=dx>0?1:-1}return}
+if(o.wait>0){o.wait-=dt;return}
+var ex=o.tx-o.x,ey=o.ty-o.y,ed=Math.hypot(ex,ey);
+if(ed<3){o.tx=20+Math.random()*(RW-40);o.ty=60+Math.random()*(RH-120);o.wait=.5+Math.random()*2;return}
+o.x+=ex/ed*sp*dt;o.y+=ey/ed*sp*dt;if(Math.abs(ex)>1)o.dir=ex>0?1:-1;
+}
+function toolUI(){
+$("tb").className=tool==="bomb"?"alt":"ghost";$("tm").className=tool==="meat"?"alt":"ghost";
+$("toolhint").textContent=tool==="bomb"?"Бомба: коснитесь звена забора внизу.":tool==="meat"?"Мясо: коснитесь земли фермы, собаки будут отвлечены на 8 секунд.":"Выберите действие: бомба ломает забор, мясо отвлекает собак. Потом нажмите «Ворваться».";
+}
+$("tb").onclick=function(){tool=tool==="bomb"?null:"bomb";toolUI()};
+$("tm").onclick=function(){tool=tool==="meat"?null:"meat";toolUI()};
+$("search").onclick=function(){
+if(s.coins<20)return say("На поиск нужно 20 монет.",true);
+s.coins-=20;
+var its=[],c=rnd(1,3),ts=["dog","dog","trap"];for(var i=0;i<c;i++)its.push(mkdef(ts[rnd(0,2)]));
+var fzz=[],cf=Math.random()<.6?10:rnd(0,9);for(i=0;i<10;i++)fzz.push(i<cf?D.fence.hp:0);
+s.t={name:names[rnd(0,names.length-1)],items:its,fz:fzz,loot:rnd(8,24)};
+tool=null;toolUI();say("Нашли ферму «"+s.t.name+"». Выберите, что делать.");
+};
+$("attack").onclick=function(){
+if(!s.t)return;
+if(s.t.fz.every(function(h){return h>0}))return say("Забор целый: сначала проломите его бомбой.",true);
+var u=edogs.filter(function(d){return d.dist<=0}).length,tr=useTrap(s.t.items);
+var p=Math.max(.05,.9-u*.35-(tr?.15:0));
+if(Math.random()<p){var n=Math.min(s.t.loot,rnd(5,12));s.eggs+=n;s.t.loot-=n;say("Вы ворвались и унесли яиц: "+n+(tr?" (капкан сработал, но вы прорвались)":"")+".")}
+else{var l=Math.min(s.coins,15);s.coins-=l;say("Вас поймали"+(u?": собак рядом "+u:"")+(tr?", капкан сработал":"")+". Потеряно монет: "+l+".",true)}
+if(s.t.loot<=0){say($("msg").textContent+" Ферма обчищена.");s.t=null}
+};
+rc.addEventListener("pointerdown",function(e){
+if(!s.t||!tool)return;
+var r=rc.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;
+if(tool==="bomb"){
+if(y<RH-70)return say("Бросайте бомбу в забор внизу.",true);
+var j=Math.min(9,Math.max(0,Math.floor(x/(RW/10)))),z=s.t.fz;
+if(z[j]<=0)return say("Там уже дыра.",true);
+if(s.coins<25)return say("Бомба стоит 25 монет.",true);
+s.coins-=25;z[j]=0;[j-1,j+1].forEach(function(k){if(k>=0&&k<10&&z[k]>0)z[k]=Math.max(1,z[k]-2)});
+bursts.push({x:(j+.5)*RW/10,y:RH-20,t:0});var fo={};[j-1,j,j+1].forEach(function(k){if(k>=0&&k<10)fo[k]=z[k]});sendHit({fz:fo});say("Бабах! Звено забора разрушено.");
+}else{
+if(y>RH-40)return say("Бросайте мясо на землю фермы выше забора.",true);
+if(s.coins<10)return say("Мясо стоит 10 монет.",true);
+s.coins-=10;meat={x:x,y:y,t:8};
+edogs.forEach(function(d){d.dist=8;d.mx=x+Math.random()*24-12;d.my=y+Math.random()*24-12});
+say(edogs.length?"Собаки бросились к мясу на 8 секунд. Сейчас самое время ворваться!":"Собак на ферме нет, мясо потрачено зря.");
+}
+});
+function drawRaid(now){
+var sv=cx;cx=rx;
+var g=cx.createLinearGradient(0,0,0,RH);g.addColorStop(0,"#B9A77E");g.addColorStop(1,"#8FA85E");
+cx.fillStyle=g;cx.fillRect(0,0,RW,RH);
+cx.textAlign="center";cx.textBaseline="middle";
+if(!s.t){cx.fillStyle="#fff";cx.font="16px sans-serif";cx.fillText("Нажмите «Искать ферму»",RW/2,RH/2);cx=sv;return}
+emoji("🧺",RW/2,30,32);cx.fillStyle="#fff";cx.font="bold 12px sans-serif";cx.fillText("🥚 "+s.t.loot,RW/2,56);
+s.t.fz.forEach(function(h,j){var x=(j+.5)*RW/10;if(h<=0){cx.strokeStyle="rgba(80,50,20,.6)";cx.setLineDash([3,3]);cx.strokeRect(x-8,RH-26,16,22);cx.setLineDash([])}else{cx.fillStyle=h>=4?"#6E4521":h>=3?"#82552A":h>=2?"#9A6530":"#C9553A";var ph=8+h*4;cx.fillRect(x-7,RH-4-ph,14,ph)}});
+ehens.forEach(function(h){hen(h.x,h.y,h.dir,0,false)});
+edogs.forEach(function(d){emoji("🐕",d.x,d.y,26,d.dir>0);if(d.dist>0)emoji("💫",d.x,d.y-20,12)});
+if(meat)emoji("🥩",meat.x,meat.y,22);
+bursts.forEach(function(b){emoji("💥",b.x,b.y-b.t*20,24+b.t*50,false,1-b.t/.6)});
+cx=sv;
+}
+function raidTick(dt,now){
+if($("raid").hidden)return;
+if(s.t&&etid!==s.t)setupEnemy();
+if(s.t){edogs.forEach(function(d){ew(d,dt,45)});ehens.forEach(function(h){ew(h,dt,30)});if(meat){meat.t-=dt;if(meat.t<=0)meat=null}}
+bursts.forEach(function(b){b.t+=dt});bursts=bursts.filter(function(b){return b.t<.6});
+drawRaid(now);
+}
+if(window.ResizeObserver)new ResizeObserver(rsize).observe($("rf"));
+var SLOT=300000,EV={grip:"Птичий грипп",fox:"Нападение лис",wind:"Сильный ветер",bear:"Медведь на ферме"},fxs=[];
+function rng(k){var t=(k+0x6D2B79F5)|0;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296}
+function evFor(k){var a=rng(k*3+1),b=rng(k*3+2),c=rng(k*3+3);if(a>.5)return null;return{type:["grip","fox","wind","bear"][Math.floor(b*4)],at:k*SLOT+Math.floor((.1+.65*c)*SLOT)}}
+function windHit(){var ids=[];s.fz.forEach(function(h,i){if(h>0)ids.push(i)});if(!ids.length)return;var i=ids[rnd(0,ids.length-1)];s.fz[i]--;if(s.fz[i]<=0){s.fz[i]=0;say("Ветер сломал звено забора.",true)}}
+function fire(t){
+fxs.push({t:0,type:t,dur:t==="wind"?60:5});
+if(t==="grip"){var k=Math.min(hens.length,rnd(3,5));for(var i=0;i<k;i++){var h=hens.splice(rnd(0,hens.length-1),1)[0];ghosts.push({x:h.x,y:h.y,t:0,e:"🤒"})}say("Птичий грипп! Погибло кур: "+k+".",true)}
+else if(t==="fox"){
+if(fdef(s.fz)>0){var z=s.fz,c=0;for(var j=0;j<4;j++){var q=rnd(0,9);if(z[q]>0){z[q]=0;c++}}say("Нападение лис! Лисы сломали звеньев забора: "+c+".",true)}
+else{var sv=Math.min(hens.length,cnt("dog")*2),eat=hens.length-sv;var gone=hens.splice(0,eat);gone.forEach(function(h){ghosts.push({x:h.x,y:h.y,t:0,e:"🦊"})});say("Лисы перепрыгнули капканы и съели кур: "+eat+(sv?" (собаки спасли "+sv+")":"")+".",true)}
+}
+else if(t==="bear"){var tn=cnt("trap");s.def=s.def.filter(function(i){return i.t!=="trap"});say(tn?"Медведь прошёл по ферме и снёс капканы: "+tn+".":"Медведь прошёл мимо: капканов не было.",true)}
+else say("Поднялся сильный ветер. Следите за забором.",true);
+}
+function evTick(){
+var now=nowS(),k=Math.floor(now/SLOT),ev=evFor(k),bar=$("ev");
+if(!ev){bar.hidden=true;return}
+var d=(ev.at-now)/1000;
+if(d>0){if(d<=30){bar.hidden=false;bar.textContent="⚠️ Через "+Math.ceil(d)+" с: "+EV[ev.type]}else bar.hidden=true;return}
+var el=-d,w=ev.type==="wind";
+if(s.evDone!==k){s.evDone=k;if(el>(w?60:20))s.wk=99;else{s.wk=w?Math.min(6,Math.floor(el/10)):0;fire(ev.type)}}
+if(w){var n=Math.min(6,Math.floor(el/10));while(s.wk<n){s.wk++;windHit()}if(el<60){bar.hidden=false;bar.textContent="💨 Сильный ветер: ещё "+Math.ceil(60-el)+" с"}else bar.hidden=true}
+else if(el<8){bar.hidden=false;bar.textContent="🔔 "+EV[ev.type]+": событие произошло"}else bar.hidden=true;
+}
+var etraps=[],sprung=[],run=null;
+function setupEnemy(){
+edogs=s.t.items.filter(function(i){return i.t==="dog"}).map(eo);
+var n=Math.min(6,2+Math.floor(s.t.loot/6));ehens=[];for(var i=0;i<n;i++)ehens.push(eo());
+meat=null;etid=s.t;run=null;sprung=[];etraps=[];
+var tn=s.t.items.filter(function(it){return it.t==="trap"}).length;for(var q=0;q<tn;q++)etraps.push({x:(q+.5)*RW/tn,y:RH-52});
+}
+function rLose(m){if(run)sendHit({traps:run.tu||0});var l=Math.min(s.coins,15);s.coins-=l;s.lock=Date.now()+1800000;s.t=null;say(m+" Потеряно монет: "+l+". Набеги недоступны 30 минут.",true);run=null}
+function rWin(){var n=Math.min(s.t.loot,rnd(5,12));sendHit({traps:run?run.tu||0:0,eggs:n,won:true});s.eggs+=n;s.t.loot-=n;say("Воришка добежал до яиц и унёс: "+n+".");run=null;if(s.t.loot<=0){say($("msg").textContent+" Ферма обчищена.");s.t=null}}
+$("attack").onclick=function(){
+if(!s.t||run)return;
+var hole=-1,best=99;
+s.t.fz.forEach(function(h,j){if(h<=0&&Math.abs(j-4.5)<best){best=Math.abs(j-4.5);hole=j}});
+if(hole<0)return say("Забор целый: сначала проломите его бомбой.",true);
+run={x:(hole+.5)*RW/10,y:RH-14,slow:false,traps:0,dir:1};
+say("Воришка бежит к яицам! Мясо отвлечёт собак, капканы скрыты.");
+};
+function raidTick(dt,now){
+if($("raid").hidden)return;
+if(s.t&&etid!==s.t)setupEnemy();
+if(s.t){
+edogs.forEach(function(d){
+if(run&&d.dist<=0){var ax=run.x-d.x,ay=run.y-d.y,ad=Math.hypot(ax,ay);
+if(ad<16){rLose("Собака схватила воришку: заход проигран.");return}
+if(ad<130){d.x+=ax/ad*62*dt;d.y+=ay/ad*62*dt;d.dir=ax>0?1:-1;return}}
+ew(d,dt,45)});
+ehens.forEach(function(h){ew(h,dt,30)});
+if(meat){meat.t-=dt;if(meat.t<=0)meat=null}
+if(run){
+var dx=RW/2-run.x,dy=44-run.y,dd=Math.hypot(dx,dy);
+if(dd<14)rWin();
+else{var sp=run.slow?32:80;run.x+=dx/dd*sp*dt;run.y+=dy/dd*sp*dt;run.dir=dx>0?1:-1;
+for(var i=etraps.length-1;i>=0&&run;i--){var t=etraps[i];if(Math.hypot(t.x-run.x,t.y-run.y)<24){etraps.splice(i,1);useTrap(s.t.items);run.tu=(run.tu||0)+1;sprung.push({x:t.x,y:t.y,t:0});run.traps++;if(run.traps>=2)rLose("Второй капкан: заход провален.");else{run.slow=true;say("Капкан! Воришка замедлился.",true)}}}}
+}
+}
+bursts.forEach(function(b){b.t+=dt});bursts=bursts.filter(function(b){return b.t<.6});
+sprung.forEach(function(p){p.t+=dt});sprung=sprung.filter(function(p){return p.t<1.2});
+drawRaid(now);
+var sv=cx;cx=rx;cx.textAlign="center";cx.textBaseline="middle";
+sprung.forEach(function(p){emoji("💢",p.x,p.y,24,false,1-p.t/1.2)});
+if(run){emoji("🥷",run.x,run.y,28,run.dir<0);if(run.slow)emoji("🐌",run.x,run.y-22,14)}
+cx=sv;
+}
+setInterval(function(){var m=Math.ceil(((s.lock||0)-Date.now())/60000),sb=$("search");if(m>0){sb.textContent="Набеги через "+m+" мин";sb.disabled=true}else if(sb.disabled){sb.textContent="Искать ферму (20)";sb.disabled=false}},1000);
+function hungriest(a){var b=null;a.forEach(function(x){if(!b||x.f<b.f)b=x});return b}
+$("feed").onclick=function(){var h=hungriest(hens);if(!h)return say("Некого кормить.",true);if(h.f>=95)return say("Все куры сыты.");if(s.coins<3)return say("Корм стоит 3 монеты.",true);s.coins-=3;h.f=100;say("Курица накормлена.")};
+$("dfeed").onclick=function(){var d=hungriest(dogs);if(!d)return say("Некого кормить.",true);if(d.f>=95)return say("Все собаки сыты.");if(s.coins<5)return say("Корм стоит 5 монет.",true);s.coins-=5;d.f=100;say("Собака накормлена.")};
+$("unlock").onclick=function(){if((s.lock||0)<=Date.now())return say("Набеги и так доступны.");if(s.gems<10)return say("Для сброса нужно 10 кристаллов.",true);s.gems-=10;s.lock=0;say("Блокировка набегов снята.")};
+setInterval(function(){var left=(s.lock||0)-Date.now(),u=$("unlock"),li=$("lockinfo");if(left>0){li.textContent="Набеги заблокированы: ещё "+Math.ceil(left/60000)+" мин";u.disabled=false}else{li.textContent="Набеги доступны";u.disabled=true}},1000);
+function mprice(m){var o=(s.pid||0)*13,a=rng(m*7+5+o),b=rng(m*7+6+o);return Math.max(3,Math.min(10,Math.round(3+a*4+b*3)))}
+if(!s.pid)s.pid=Math.floor(Math.random()*1e6);
+function mnow(){return Math.floor(Date.now()/60000)}
+function mdraw(){
+var m=mnow(),p=mprice(m),q=mprice(m-1);
+$("mprice").textContent=p+" монет";
+$("mtrend").textContent=p>q?"▲ выше, чем минуту назад ("+q+")":p<q?"▼ ниже, чем минуту назад ("+q+")":"■ без изменений";
+$("mnext").textContent="Новая цена через "+(60-Math.floor(Date.now()/1000)%60)+" с. У каждого игрока своя цена.";
+var h="";for(var i=11;i>=0;i--){var v=mprice(m-i);h+='<div style="flex:1;height:'+(v*9)+'%;background:'+(i?'var(--line)':'var(--yolk)')+';border-radius:3px 3px 0 0"></div>'}
+$("mhist").innerHTML=h;
+$("msell1").disabled=!s.eggs;$("msellall").disabled=!s.eggs;
+$("msellall").textContent="Продать все ("+s.eggs+")";
+}
+$("msell1").onclick=function(){if(!s.eggs)return;var p=mprice(mnow());s.eggs--;s.coins+=p;say("Продано 1 яйцо за "+p+" монет.")};
+$("msellall").onclick=function(){if(!s.eggs)return;var p=mprice(mnow()),n=s.eggs;s.coins+=n*p;s.eggs=0;say("Продано яиц: "+n+" по "+p+" монет, всего "+n*p+".")};
+$("sell").onclick=function(){openSheet("market");mdraw()};
+setInterval(function(){$("sell").textContent="Рынок: яйцо "+mprice(mnow())+" мон.";if(!$("market").hidden)mdraw()},1000);
+var SUPABASE_URL="https://eqggqjpfjfkbnxnehpce.supabase.co",SUPABASE_KEY="sb_publishable_NNkZA8rkm42tRUXbyjxoNw_Tm0pxu-B";
+var MP=null,sb=null,pubBusy=false,pollBusy=false,lastSig="";
+function sendHit(x){
+if(!MP||!s.t||!s.t.pid)return;
+var d={from:MP.name,fz:{},traps:0,eggs:0,won:false};for(var k in x)d[k]=x[k];
+sb.from("hits").insert({to_id:s.t.pid,from_id:MP.id,data:d}).then(function(r){if(r.error)say("Атака не доставлена игроку.",true)});
+}
+async function applyHit(row){
+var r=await sb.from("hits").delete().eq("id",row.id).select();
+if(r.error||!r.data||!r.data.length)return;
+var h=row.data||{},fk=Object.keys(h.fz||{});
+fk.forEach(function(k){var j=+k,v=h.fz[k];if(j>=0&&j<10&&s.fz[j]>v)s.fz[j]=v});
+var tr=0;for(var i=0;i<(h.traps||0);i++)if(useTrap(s.def))tr++;
+var eg=Math.min(s.eggs,h.eggs||0);s.eggs-=eg;
+var lost=0;if(h.won&&hens.length>1){hens.splice(rnd(0,hens.length-1),1);lost=1}
+say("Вас атаковал игрок «"+h.from+"»"+(eg?": украдено яиц "+eg:"")+(tr?", сработало капканов: "+tr:"")+(lost?", потеряна курица":"")+(fk.length?", забор повреждён":"")+".",true);
+}
+async function pollHits(){
+if(!MP||pollBusy)return;pollBusy=true;
+try{var r=await sb.from("hits").select("id,data").eq("to_id",MP.id);if(r.data)for(var i=0;i<r.data.length;i++)await applyHit(r.data[i])}catch(e){}
+pollBusy=false;
+}
+async function pubFarm(){
+if(!MP||pubBusy)return;
+var d={fz:s.fz.slice(),dogs:cnt("dog"),traps:cnt("trap"),eggs:s.eggs},sig=JSON.stringify(d);
+if(sig===lastSig)return;
+pubBusy=true;lastSig=sig;
+try{var r=await sb.from("players").upsert({id:MP.id,name:MP.name,data:d,updated_at:new Date().toISOString()});if(r.error)lastSig=""}catch(e){lastSig=""}
+pubBusy=false;
+}
+var cloudBusy=false,cloudSig="";
+async function pushSave(){
+if(!MP||cloudBusy)return;
+var raw=localStorage.getItem(KEY);if(!raw||raw===cloudSig)return;
+cloudBusy=true;
+try{var d=JSON.parse(raw),r=await sb.from("saves").upsert({id:MP.id,data:d,ts:d.ts||Date.now()});if(!r.error)cloudSig=raw}catch(e){}
+cloudBusy=false;
+}
+async function pullSave(force){
+try{
+var r=await sb.from("saves").select("data,ts").eq("id",MP.id).maybeSingle();
+if(!r.data)return;
+var loc=0;try{loc=(JSON.parse(localStorage.getItem(KEY))||{}).ts||0}catch(e){}
+if(force||r.data.ts>loc+5000){window.noSave=true;localStorage.setItem(KEY,JSON.stringify(r.data.data));location.reload()}
+}catch(e){}
+}
+async function startMP(id,name,force){
+MP={id:id,name:name};$("who").textContent="Игрок: "+name+" (нажмите, чтобы выйти)";$("reg").hidden=true;
+await pullSave(force);
+if(window.noSave)return;
+setInterval(pubFarm,15000);pubFarm();setInterval(pollHits,8000);pollHits();
+pushSave();setInterval(pushSave,30000);
+}
+$("who").onclick=async function(){if(MP&&sb&&confirm("Выйти из аккаунта?")){await pushSave();window.noSave=true;await sb.auth.signOut();location.reload()}};
+async function mailOf(n){
+var d=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(n.toLowerCase()));
+return Array.from(new Uint8Array(d)).map(function(b){return("0"+b.toString(16)).slice(-2)}).join("").slice(0,40)+"@example.com";
+}
+async function afterLogin(user,nick,force){
+var r=await sb.from("players").select("name").eq("id",user.id).maybeSingle();
+if(r.data&&r.data.name)return startMP(user.id,r.data.name,force);
+if(!nick)return showReg();
+var q=await sb.from("players").insert({id:user.id,name:nick,data:{fz:s.fz.slice(),dogs:cnt("dog"),traps:cnt("trap"),eggs:s.eggs}});
+if(q.error)return $("regmsg").textContent=q.error.code==="23505"?"Этот ник занят, выберите другой.":"Не удалось сохранить игрока.";
+startMP(user.id,nick,force);
+}
+var regMode="up";
+function setMode(m){regMode=m;$("tabup").className=m==="up"?"alt":"ghost";$("tabin").className=m==="in"?"alt":"ghost";$("regbtn").textContent=m==="up"?"Зарегистрироваться":"Войти";$("regmsg").textContent=""}
+function showReg(){
+$("reg").hidden=false;setMode("up");
+$("tabup").onclick=function(){setMode("up")};$("tabin").onclick=function(){setMode("in")};
+$("skipbtn").onclick=function(){$("reg").hidden=true};
+$("regbtn").onclick=async function(){
+var n=$("nick").value.trim(),pw=$("pass").value,msg=$("regmsg");
+if(n.length<2)return msg.textContent="Ник должен быть не короче 2 символов.";
+if(pw.length<6)return msg.textContent="Пароль должен быть не короче 6 символов.";
+$("regbtn").disabled=true;
+try{
+var em=await mailOf(n),a;
+if(regMode==="up"){
+a=await sb.auth.signUp({email:em,password:pw});
+if(a.error){msg.textContent=/regist|exist/i.test(a.error.message)?"Этот ник занят. Если он ваш, откройте вкладку «Вход».":"Не удалось зарегистрироваться: "+a.error.message;return}
+if(!a.data.session){msg.textContent="В Supabase включено подтверждение почты. Отключите «Confirm email» в настройках входа.";return}
+await afterLogin(a.data.user,n,false);
+}else{
+a=await sb.auth.signInWithPassword({email:em,password:pw});
+if(a.error){msg.textContent="Неверный ник или пароль.";return}
+await afterLogin(a.data.user,n,true);
+}
+}finally{$("regbtn").disabled=false}
+};
+}
+(async function(){
+if(!window.supabase||SUPABASE_URL.indexOf("PASTE")===0)return say("Одиночная игра: мультиплеер не настроен.");
+sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);syncClock();
+var se=(await sb.auth.getSession()).data.session;
+if(se)return afterLogin(se.user,null,false);
+showReg();
+})();
+$("search").onclick=async function(){
+if(!MP)return say("Войдите по e-mail, чтобы нападать на других игроков.",true);
+if(s.coins<20)return say("На поиск нужно 20 монет.",true);
+var r=await sb.from("players").select("id,name,data").neq("id",MP.id).limit(100);
+if(r.error)return say("Не удалось получить список игроков.",true);
+var c=(r.data||[]).filter(function(p){return p.data&&p.data.fz&&p.data.eggs>0});
+if(!c.length)return say("Пока нет других игроков с яйцами. Пригласите друзей!",true);
+var p=c[rnd(0,c.length-1)],d=p.data,its=[];
+for(var i=0;i<(d.dogs||0);i++)its.push(mkdef("dog"));
+for(i=0;i<(d.traps||0);i++)its.push(mkdef("trap"));
+s.coins-=20;s.t={pid:p.id,name:p.name,items:its,fz:d.fz.slice(),loot:Math.min(d.eggs,40)};
+tool=null;toolUI();say("Нашли ферму игрока «"+p.name+"». Выберите, что делать.");
+};
+var hm=location.hash.slice(1);
+if(hm==="silver")window.silverUntil=Date.now()+60000;
+if(EV[hm])setTimeout(function(){fire(hm);if(hm==="wind"){var n=0,iv=setInterval(function(){windHit();if(++n>=6)clearInterval(iv)},10000)}},1500);
+cv.addEventListener("pointerdown",function(e){var r=cv.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;if(silverHen&&Math.hypot(x-silverHen.x,y-silverHen.y)<34){catchSilver();return}["hf","hw","df","dw"].forEach(function(k){var p=spos(k);if(Math.abs(x-p.x)<24&&Math.abs(y-p.y)<22)refill(k,"coins")})});
+window.addEventListener("resize",size);if(window.ResizeObserver)new ResizeObserver(size).observe($("field"));
+var KEY="chickenMeadow1";
+function save(){if(window.noSave)return;try{localStorage.setItem(KEY,JSON.stringify({s:s,ts:Date.now(),hens:hens.map(function(h){return{x:h.x,y:h.y,f:h.f,w:h.w,p:h.p}}),dogs:dogs.map(function(o){return{x:o.x,y:o.y,f:o.f,w:o.w}})}))}catch(e){}}
+function load(){try{var r=localStorage.getItem(KEY);if(!r)return false;var d=JSON.parse(r);Object.assign(s,d.s);if(!Array.isArray(s.def)){s.def=[];["fence","dog","trap"].forEach(function(t){for(var q=0;q<(d.s[t]||0);q++)s.def.push(mkdef(t))})}if(s.t&&(!s.t.items||!s.t.fz||!s.t.pid))s.t=null;var tz=0;s.def=s.def.filter(function(i){return i.t!=="trap"||++tz<=5});s.def=s.def.filter(function(i){if(i.t!=="fence")return true;var k=s.fz.indexOf(0);if(k>=0)s.fz[k]=D.fence.hp;return false});hens=d.hens.map(function(o){var h=mk();h.x=o.x;h.y=o.y;h.tx=o.x;h.ty=o.y;h.f=o.f;h.w=o.w;h.p=o.p;return h});var nd=cnt("dog");(d.dogs||[]).slice(0,nd).forEach(function(o){var g=mk();g.x=o.x;g.y=o.y;g.tx=o.x;g.ty=o.y;g.f=o.f;g.w=o.w;dogs.push(g)});while(dogs.length<nd)dogs.push(mkDog());if(d.ts)away(d.ts,Date.now());say(welcomeMsg(),true);return true}catch(e){return false}}
+if(!load()){newHen();newHen()}
+size();
+setInterval(save,2000);
+var hiddenAt=0;document.addEventListener("visibilitychange",function(){if(document.hidden){hiddenAt=Date.now();save()}else if(hiddenAt){var sec=(Date.now()-hiddenAt)/1000,fr=hiddenAt;hiddenAt=0;if(sec>10){away(fr,Date.now());say(welcomeMsg(),true)}}});
+window.addEventListener("pagehide",save);
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
