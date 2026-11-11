@@ -516,11 +516,12 @@ var MP=null,sb=null,pubBusy=false,pollBusy=false,lastSig="";
 function sendHit(x){
 if(!MP||!s.t||!s.t.pid||s.t.pid==="bot")return;
 var d={from:MP.name,fz:{},traps:0,eggs:0,won:false};for(var k in x)d[k]=x[k];
-sb.from("hits").insert({to_id:s.t.pid,from_id:MP.id,data:d}).then(function(r){if(r.error)say("Атака не доставлена игроку.",true)});
+sb.from("hits").insert({to_id:s.t.pid,from_id:MP.id,data:d}).then(function(r){if(r.error)say("Атака не доставлена: "+r.error.message,true);else say($("msg").textContent+" Результат отправлен игроку.")});
+sb.rpc("raid_apply",{target:s.t.pid,stolen:d.eggs||0,fz:d.fz||{},traps:d.traps||0}).then(function(){},function(){});
 }
 async function applyHit(row){
 var r=await sb.from("hits").delete().eq("id",row.id).select();
-if(r.error||!r.data||!r.data.length)return;
+if(r.error){say("Ошибка приёма атаки: "+r.error.message,true);return}if(!r.data||!r.data.length)return;
 var h=row.data||{},fk=Object.keys(h.fz||{});
 fk.forEach(function(k){var j=+k,v=h.fz[k];if(j>=0&&j<10&&s.fz[j]>v)s.fz[j]=v});
 var tr=0;for(var i=0;i<(h.traps||0);i++)if(useTrap(s.def))tr++;
@@ -530,7 +531,7 @@ say("Вас атаковал игрок «"+h.from+"»"+(eg?": украдено 
 }
 async function pollHits(){
 if(!MP||pollBusy)return;pollBusy=true;
-try{var r=await sb.from("hits").select("id,data").eq("to_id",MP.id);if(r.data)for(var i=0;i<r.data.length;i++)await applyHit(r.data[i])}catch(e){}
+try{var r=await sb.from("hits").select("id,data").eq("to_id",MP.id);if(r.error){if(window.pe!==r.error.message){window.pe=r.error.message;say("Ошибка получения атак: "+r.error.message,true)}}else if(r.data)for(var i=0;i<r.data.length;i++)await applyHit(r.data[i])}catch(e){}
 pollBusy=false;
 }
 async function pubFarm(){
@@ -538,7 +539,7 @@ if(!MP||pubBusy)return;
 var d={fz:s.fz.slice(),dogs:cnt("dog"),traps:cnt("trap"),eggs:s.eggs},sig=JSON.stringify(d);
 if(sig===lastSig)return;
 pubBusy=true;lastSig=sig;
-try{var r=await sb.from("players").upsert({id:MP.id,name:MP.name,data:d,updated_at:new Date().toISOString()});if(r.error)lastSig=""}catch(e){lastSig=""}
+try{var r=await sb.from("players").upsert({id:MP.id,name:MP.name,data:d,updated_at:new Date().toISOString()});if(r.error){lastSig="";if(window.pf!==r.error.message){window.pf=r.error.message;say("Ошибка синхронизации фермы: "+r.error.message,true)}}}catch(e){lastSig=""}
 pubBusy=false;
 }
 var cloudBusy=false,cloudSig="";
@@ -561,7 +562,7 @@ async function startMP(id,name,force){
 MP={id:id,name:name};if(s.t&&s.t.pid==="bot")s.t=null;$("who").textContent="Игрок: "+name+" (нажмите, чтобы выйти)";$("reg").hidden=true;
 await pullSave(force);
 if(window.noSave)return;
-setInterval(pubFarm,15000);pubFarm();setInterval(pollHits,8000);pollHits();
+setInterval(pubFarm,15000);pubFarm();setInterval(pollHits,4000);pollHits();
 pushSave();setInterval(pushSave,30000);
 }
 $("who").onclick=async function(){if(MP&&sb&&confirm("Выйти из аккаунта?")){await pushSave();window.noSave=true;await sb.auth.signOut();location.reload()}};
