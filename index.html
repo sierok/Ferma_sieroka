@@ -125,7 +125,7 @@ function nowS(){return Date.now()+clockOff}
 async function syncClock(){try{var t0=Date.now(),r=await sb.rpc("server_time");if(r.error||r.data==null)return;clockOff=Number(r.data)-(t0+Date.now())/2}catch(e){}}
 setInterval(function(){if(sb)syncClock()},600000);
 function silverFor(k){return rng(k*5+11)<0.003?{at:k*SLOT+Math.floor((.1+.6*rng(k*5+12))*SLOT)}:null}
-function silverTick(dt){
+function silverTick(dt){if(!MP){silverHen=null;$("ev2").hidden=true;return}
 var now=nowS(),k=Math.floor(now/SLOT),ev=silverFor(k),b=$("ev2"),forced=(window.silverUntil||0)>Date.now(),left=0;
 if(forced)left=window.silverUntil-Date.now();
 else if(ev&&now>=ev.at&&now<=ev.at+60000&&s.silverK!==k)left=ev.at+60000-now;
@@ -215,8 +215,8 @@ dogs.forEach(function(d){d.f-=1.0*dt;d.w-=1.2*dt;if(d.f<=0||d.w<=0){d.dead=true;
 dogs=dogs.filter(function(d){return!d.dead});
 pops.forEach(function(p){p.t+=dt});pops=pops.filter(function(p){return p.t<1.2});
 ghosts.forEach(function(p){p.t+=dt});ghosts=ghosts.filter(function(p){return p.t<2});fxs.forEach(function(f){f.t+=dt});fxs=fxs.filter(function(f){return f.t<f.dur});
-s.raidIn-=dt;
-if(false){
+s.raidIn=MP?40:s.raidIn-dt;
+if(!MP&&s.raidIn<=0){
 s.raidIn=rnd(35,55);
 if(rnd(1,8)>def()){
 var l=Math.floor(s.eggs*.3),k=Math.min(hens.length,rnd(1,2));s.eggs-=l;
@@ -514,7 +514,7 @@ setInterval(function(){$("sell").textContent="Рынок: яйцо "+mprice(mnow
 var SUPABASE_URL="https://eqggqjpfjfkbnxnehpce.supabase.co",SUPABASE_KEY="sb_publishable_NNkZA8rkm42tRUXbyjxoNw_Tm0pxu-B";
 var MP=null,sb=null,pubBusy=false,pollBusy=false,lastSig="";
 function sendHit(x){
-if(!MP||!s.t||!s.t.pid)return;
+if(!MP||!s.t||!s.t.pid||s.t.pid==="bot")return;
 var d={from:MP.name,fz:{},traps:0,eggs:0,won:false};for(var k in x)d[k]=x[k];
 sb.from("hits").insert({to_id:s.t.pid,from_id:MP.id,data:d}).then(function(r){if(r.error)say("Атака не доставлена игроку.",true)});
 }
@@ -558,7 +558,7 @@ if(force||r.data.ts>loc+5000){window.noSave=true;localStorage.setItem(KEY,JSON.s
 }catch(e){}
 }
 async function startMP(id,name,force){
-MP={id:id,name:name};$("who").textContent="Игрок: "+name+" (нажмите, чтобы выйти)";$("reg").hidden=true;
+MP={id:id,name:name};if(s.t&&s.t.pid==="bot")s.t=null;$("who").textContent="Игрок: "+name+" (нажмите, чтобы выйти)";$("reg").hidden=true;
 await pullSave(force);
 if(window.noSave)return;
 setInterval(pubFarm,15000);pubFarm();setInterval(pollHits,8000);pollHits();
@@ -611,7 +611,13 @@ if(se)return afterLogin(se.user,null,false);
 showReg();
 })();
 $("search").onclick=async function(){
-if(!MP)return say("Войдите по e-mail, чтобы нападать на других игроков.",true);
+if(!MP){
+if(s.coins<20)return say("На поиск нужно 20 монет.",true);
+var bi=[],bc=rnd(1,3),bt=["dog","dog","trap"];for(var j=0;j<bc;j++)bi.push(mkdef(bt[rnd(0,2)]));
+var bz=[],bf=Math.random()<.6?10:rnd(0,9);for(j=0;j<10;j++)bz.push(j<bf?D.fence.hp:0);
+s.coins-=20;s.t={pid:"bot",name:names[rnd(0,names.length-1)],items:bi,fz:bz,loot:rnd(8,24)};
+tool=null;toolUI();return say("Нашли ферму бота «"+s.t.name+"». Выберите, что делать.");
+}
 if(s.coins<20)return say("На поиск нужно 20 монет.",true);
 var r=await sb.from("players").select("id,name,data").neq("id",MP.id).limit(100);
 if(r.error)return say("Не удалось получить список игроков.",true);
