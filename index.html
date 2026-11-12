@@ -40,7 +40,22 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .sh .x{padding:8px 12px}
 .item button{padding:8px 10px}
 </style>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.3/dist/umd/supabase.js"></script>
+<script>
+(function(){
+var L=["https://sierok-proxy.wertysierok.workers.dev/lib/supabase.js","https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.3/dist/umd/supabase.js","https://fastly.jsdelivr.net/npm/@supabase/supabase-js@2.112.3/dist/umd/supabase.js","https://unpkg.com/@supabase/supabase-js@2.112.3/dist/umd/supabase.js"],i=0;
+window.sbReady=new Promise(function(res){
+function next(){
+if(window.supabase||i>=L.length)return res(!!window.supabase);
+var s=document.createElement("script"),done=false,t;
+function go(ok){if(done)return;done=true;clearTimeout(t);if(ok&&window.supabase)res(true);else next()}
+t=setTimeout(function(){go(false)},6000);
+s.onload=function(){go(true)};s.onerror=function(){go(false)};
+s.src=L[i++];document.head.appendChild(s);
+}
+next();
+});
+})();
+</script>
 </head>
 <body>
 <div class="top"><span id="c"></span><span id="g"></span><span id="e"></span><span id="d"></span></div>
@@ -215,8 +230,8 @@ dogs.forEach(function(d){d.f-=1.0*dt;d.w-=1.2*dt;if(d.f<=0||d.w<=0){d.dead=true;
 dogs=dogs.filter(function(d){return!d.dead});
 pops.forEach(function(p){p.t+=dt});pops=pops.filter(function(p){return p.t<1.2});
 ghosts.forEach(function(p){p.t+=dt});ghosts=ghosts.filter(function(p){return p.t<2});fxs.forEach(function(f){f.t+=dt});fxs=fxs.filter(function(f){return f.t<f.dur});
-s.raidIn=MP?40:s.raidIn-dt;
-if(!MP&&s.raidIn<=0){
+s.raidIn=(MP||!window.mpReady)?40:s.raidIn-dt;
+if(!MP&&window.mpReady&&s.raidIn<=0){
 s.raidIn=rnd(35,55);
 if(rnd(1,8)>def()){
 var l=Math.floor(s.eggs*.3),k=Math.min(hens.length,rnd(1,2));s.eggs-=l;
@@ -583,7 +598,7 @@ function setMode(m){regMode=m;$("tabup").className=m==="up"?"alt":"ghost";$("tab
 function showReg(){
 $("reg").hidden=false;setMode("up");
 $("tabup").onclick=function(){setMode("up")};$("tabin").onclick=function(){setMode("in")};
-$("skipbtn").onclick=function(){$("reg").hidden=true};
+$("skipbtn").onclick=function(){$("reg").hidden=true;window.mpReady=true};
 $("regbtn").onclick=async function(){
 var n=$("nick").value.trim(),pw=$("pass").value,msg=$("regmsg");
 if(n.length<2)return msg.textContent="Ник должен быть не короче 2 символов.";
@@ -605,7 +620,8 @@ await afterLogin(a.data.user,n,true);
 };
 }
 (async function(){
-if(!window.supabase||SUPABASE_URL.indexOf("PASTE")===0)return say("Одиночная игра: мультиплеер не настроен.");
+if(SUPABASE_URL.indexOf("PASTE")===0){window.mpReady=true;return say("Одиночная игра: мультиплеер не настроен.")}
+if(!(await window.sbReady)){window.mpReady=true;return say("Мультиплеер не загрузился: библиотека недоступна в вашей сети. Идёт одиночная игра.",true)}
 sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:"sb-eqggqjpfjfkbnxnehpce-auth-token"}});syncClock();
 var se=(await sb.auth.getSession()).data.session;
 if(se)return afterLogin(se.user,null,false);
