@@ -598,7 +598,7 @@ if(!a.data.session){msg.textContent="В Supabase включено подтвер
 await afterLogin(a.data.user,n,false);
 }else{
 a=await sb.auth.signInWithPassword({email:em,password:pw});
-if(a.error){msg.textContent="Неверный ник или пароль.";return}
+if(a.error){msg.textContent=/fetch|network|retry|timeout/i.test(a.error.name+" "+a.error.message)?"Нет связи с сервером. Проверьте интернет и прокси.":"Неверный ник или пароль.";return}
 await afterLogin(a.data.user,n,true);
 }
 }finally{$("regbtn").disabled=false}
@@ -606,7 +606,7 @@ await afterLogin(a.data.user,n,true);
 }
 (async function(){
 if(!window.supabase||SUPABASE_URL.indexOf("PASTE")===0)return say("Одиночная игра: мультиплеер не настроен.");
-sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);syncClock();
+sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storageKey:"sb-eqggqjpfjfkbnxnehpce-auth-token"}});syncClock();
 var se=(await sb.auth.getSession()).data.session;
 if(se)return afterLogin(se.user,null,false);
 showReg();
