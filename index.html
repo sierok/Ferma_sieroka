@@ -511,7 +511,7 @@ $("msell1").onclick=function(){if(!s.eggs)return;var p=mprice(mnow());s.eggs--;s
 $("msellall").onclick=function(){if(!s.eggs)return;var p=mprice(mnow()),n=s.eggs;s.coins+=n*p;s.eggs=0;say("Продано яиц: "+n+" по "+p+" монет, всего "+n*p+".")};
 $("sell").onclick=function(){openSheet("market");mdraw()};
 setInterval(function(){$("sell").textContent="Рынок: яйцо "+mprice(mnow())+" мон.";if(!$("market").hidden)mdraw()},1000);
-var SUPABASE_URL="https://eqggqjpfjfkbnxnehpce.supabase.co",SUPABASE_KEY="sb_publishable_NNkZA8rkm42tRUXbyjxoNw_Tm0pxu-B";
+var SUPABASE_URL="https://sierok-proxy.wertysierok.workers.dev",SUPABASE_KEY="sb_publishable_NNkZA8rkm42tRUXbyjxoNw_Tm0pxu-B";
 var MP=null,sb=null,pubBusy=false,pollBusy=false,lastSig="";
 function sendHit(x){
 if(!MP||!s.t||!s.t.pid||s.t.pid==="bot")return;
